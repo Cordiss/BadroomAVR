@@ -1,3 +1,9 @@
+/*----------------------------------------------------------------------------*
+*-----------------------------------------------------------------------------*
+*--------------------------------[VERSION 1.1]--------------------------------*
+*-----------------------------------------------------------------------------*
+*-----------------------------------------------------------------------------*/
+
 #define F_CPU           16000000UL
 
 #include <avr/io.h>
@@ -10,7 +16,6 @@
 #define LIGHT_BORDER    810     // Граница освещенности комнаты, при которой включается подсветка;
 #define MAX_TIME        60000   // Таймер;
 #define MAX_HUM         75.0    // Граница влажности в комнате;
-#define MAX_TEMP        29.0    // Граница максимальной температуры;
 
 #define RELAY_FAN       6       // DDRD;
 #define RELAY_LED       7       // DDRD;
@@ -18,6 +23,9 @@
 #define LED_ONBOARD     5       // DDRB;
 #define LIGHTSENSOR     3       // DDRC;
 #define DHTPIN          2       // DDRC;
+
+
+float h = 0.0;
 
 unsigned long currentTime = 0;  // для хранения информации о текущем времени
 bool FLAG = false;              // ключевой флаг
@@ -62,6 +70,7 @@ void loop()
         PORTD |= (1 << RELAY_LED); // устанавливаем HIGH на D7
     } 
     _analogRead(); // получаем данные с АЦП
+    _delay_ms(100); // задержка для получения данных
     if (bitRead(PINB, 0)) // if moverment detected...
     {        
         PORTD &= ~(1 << RELAY_FAN); // априорно включаем вентилятор
@@ -70,25 +79,27 @@ void loop()
             // если в комнате темно включаем подсветку
             PORTD &= ~(1 << RELAY_LED);
         }
+        else PORTD |= (1 << RELAY_LED);
         currentTime = millis(); // запоминаем текущее время
         FLAG = true; // поднимаем флаг
+        wdt_reset();
         return;
     }
-    float h = dht.readHumidity(); // считываем влажность с DHT датчика
-    float t = dht.readTemperature(); // считываем температуру с DHT датчика
+
+    h = dht.readHumidity(); // считываем влажность с DHT датчика
 
     if (isnan(h)) // проверка на корректность данных
     {
         PORTB |= (1 << LED_ONBOARD); // включаем сигнализирующий светодиод на плате
+        wdt_reset(); // сбрасываем watchdog
         return;
     }
     // Если текущая влажность или температура выше установленной границы...
-    if (h >= MAX_HUM || t >= MAX_TEMP) 
+    if (h >= MAX_HUM) 
     { 
         PORTD &= ~(1 << RELAY_FAN); // включаем вентилятор
         currentTime = millis(); // запоминаем текущее время
         FLAG = true; // поднимаем флаг
-        return;
     }
 
     wdt_reset(); // сбрасываем watchdog
